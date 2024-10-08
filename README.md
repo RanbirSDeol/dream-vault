@@ -46,12 +46,14 @@ Make sure you are inside the /dream-vault directory when doing this. You
 can also choose to change the location of journal if you wish, but you must
 go into dream-vault/src/journal.py and edit the directories path.
 
-Also add a sync.txt (optional: if you want to use the sync command)
+Also add a sync.txt (optional: if you want to use the sync command), and add
+the logs.txt file (required).
 
 ```bash
 mkdir backups
 mkdir journal
 touch sync.txt
+touch logs.txt
 ```
 
 ## Step 4: Execute Program
