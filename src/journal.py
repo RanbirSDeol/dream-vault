@@ -445,6 +445,7 @@ def date_formatter(date_unformatted, flipped, bracketBug):
         # Checking if we have a split of 2 parts [Day Month, Year]
         if len(parts) == 2:
             # We have [Month Day, Year]
+            
             if flipped:
                 # Getting the day and month, also removing the starting '('
                 day_month = parts[0].strip().removeprefix('(')
@@ -687,7 +688,7 @@ def navigate():
             index = len(dream_files) - 1
 
         # Dream Count Display
-        print(f"\n{Color.BLUE}Dream: [{index + 1}/{len(dream_files)}]{Color.END} | @ {dream_files[index]}\n")
+        print(f"\n{Color.BLUE}Dream: [{index + 1}/{len(dream_files)}]{Color.END} | @ {dream_files[index]}\n\n───────────────────────────────────────────────────────────────────────")
         
         # Display the latest dream
         display_attempt = display_dream(dream_files[index], False)
@@ -773,7 +774,7 @@ def navigate():
 # [✅]
 def sync():
     """
-    Sync loads a .txt file and reads all the contents. It then
+    Sync loads a .txt fiFe and reads all the contents. It then
     turns the text inside the body into a dream journal. There is
     a specific format to be followed, and this format is used in 'backup()'
 
@@ -796,56 +797,116 @@ def sync():
         entry = None
         capture_body = False
 
-        # Loop through every line in our sync.txt
-        for line in content:
-            # Remove leading and trailing spaces
-            line = line.strip()
+        if SYNC_EXTERNAL == False:
+            # Loop through every line in our sync.txt
+            for line in content:
+                # Remove leading and trailing spaces
+                line = line.strip()
 
-            # Check if the line starts with our delimiter
-            if line == "==============================":
-                # Check if an entry exists and append it to organized_entries
-                if entry and entry["Body"]:
+                # Check if the line starts with our delimiter
+                if line == "==============================":
+                    # Check if an entry exists and append it to organized_entries
+                    if entry and entry["Body"]:
+                        organized_entries.append(entry)
+                    # Initialize a new entry
+                    entry = {"Date": "", "Title": "", "Body": ""}
+                    capture_body = False
+
+                # If we have an entry
+                elif entry is not None:
+                    if line.startswith("[ (") and "|" in line:
+                        # Extract title and date
+                        parts = line.split("|")
+                        entry["Title"] = parts[0].strip("[ (")[:-1].strip()
+                        entry["Date"] = parts[1].strip(") ]")[1:].strip()
+                    elif line.startswith("───────────────────────────────────────────────────────────────────────"):
+                        capture_body = True
+                        if entry["Body"]:
+                            entry["Body"] += "\n"
+                        entry["Body"] += line
+                    elif capture_body:
+                        if entry["Body"]:
+                            entry["Body"] += "\n"
+                        entry["Body"] += line
+
+            # If we have a valid entry at the end of the file, append it to organized_entries
+            if entry and entry["Body"]:
+                organized_entries.append(entry)
+
+            # Loop through the entries, and create a journal .txt for each
+            for entry in organized_entries:
+                try:
+                    # We'll split our date, to check if it is valid
+                    day, month, year = date_formatter(entry['Date'], False, False).split('-')
+                    # Make sure we don't have a bad entry
+                    if year == 'DirtyEntry' or month == 'DirtyEntry' or day == 'DirtyEntry':
+                        print(f"{Color.RED}Invalid Entry: {entry['Title']}{Color.END}")
+                    else:
+                        # If everything is valid, let's create our dream
+                        create_dream(year, month, day, entry['Title'], entry['Body'], True)
+                        # Add it to the total
+                        files_created_count += 1
+                except Exception as e:
+                    print(f"\n{Color.RED}Syncing Failed! {e}{Color.END}\n")
+        else:
+            # Loop through every line in our sync.txt
+            for line in content:
+                # Remove spaces
+                line = line.strip()
+
+                # Check if the line starts with our delimiter
+                if line.startswith("=============================="):
+
+                    # Check if an entry exists
+                    if entry:
+                        # Clean up leading/trailing spaces in title and body
+                        if "Title" in entry:
+                            # Title, Date, and then the rest is the body
+                            entry["Title"] = entry["Title"].strip()
+                            entry["Body"] = entry["Body"].strip()
+                            organized_entries.append(entry)
+
+                    # If we don't have an entry, let's set one up
+                    entry = {"Date": "", "Title": "", "Body": ""}
+                
+                # Otherwise if we have an entry
+                elif entry:
+                    # If we don't have a date
+                    if not entry["Date"]:
+                        # Grab the date
+                        entry["Date"] = line.strip()
+                    # If we don't have a title
+                    elif not entry["Title"]:
+                        # Grab the title
+                        entry["Title"] = line.strip()
+                    # Otherwise
+                    else:
+                        if line: 
+                            # Only add non-empty lines to body
+                            if entry["Body"]:
+                                entry["Body"] += "\n"
+                            entry["Body"] += line
+
+            # If we have a valid entry
+            if entry:
+                # Clean up leading/trailing spaces in title and body for the last entry
+                if "Title" in entry:
+                    entry["Title"] = entry["Title"].strip()
+                    entry["Body"] = entry["Body"].strip()
                     organized_entries.append(entry)
-                # Initialize a new entry
-                entry = {"Date": "", "Title": "", "Body": ""}
-                capture_body = False
-
-            # If we have an entry
-            elif entry is not None:
-                if line.startswith("[ (") and "|" in line:
-                    # Extract title and date
-                    parts = line.split("|")
-                    entry["Title"] = parts[0].strip("[ (")[:-1].strip()
-                    entry["Date"] = parts[1].strip(") ]")[1:].strip()
-                elif line.startswith("───────────────────────────────────────────────────────────────────────"):
-                    capture_body = True
-                    if entry["Body"]:
-                        entry["Body"] += "\n"
-                    entry["Body"] += line
-                elif capture_body:
-                    if entry["Body"]:
-                        entry["Body"] += "\n"
-                    entry["Body"] += line
-
-        # If we have a valid entry at the end of the file, append it to organized_entries
-        if entry and entry["Body"]:
-            organized_entries.append(entry)
-
-        # Loop through the entries, and create a journal .txt for each
-        for entry in organized_entries:
-            try:
-                # We'll split our date, to check if it is valid
-                day, month, year = date_formatter(entry['Date'], False, False).split('-')
-                # Make sure we don't have a bad entry
-                if year == 'DirtyEntry' or month == 'DirtyEntry' or day == 'DirtyEntry':
-                    print(f"{Color.RED}Invalid Entry: {entry['Title']}{Color.END}")
-                else:
-                    # If everything is valid, let's create our dream
-                    create_dream(year, month, day, entry['Title'], entry['Body'], True)
-                    # Add it to the total
-                    files_created_count += 1
-            except Exception as e:
-                print(f"\n{Color.RED}Syncing Failed! {e}{Color.END}\n")
+            # Loop through the entries, and create a journal .txt for each
+            for entry in organized_entries:
+                try:
+                    # FIX HERE
+                    year, month, day = date_formatter(entry['Date'], False, False).split('-')
+                    formatted_title = str(entry['Title']).lower().replace(' ', '_')[0:25]
+                    if year == 'DirtyEntry' or month == 'DirtyEntry' or day == 'DirtyEntry':
+                        print(f"Invalid Entry :{entry['Title']}")
+                    else:
+                        log("Creating the dream: ", entry['Title'])
+                        #create_dream(year, month, day, formatted_title, entry['Title'], entry['Body'], False)
+                except Exception as e:
+                    print(e)
 
     except Exception as e:
         print(f"Error? {e}")
@@ -959,9 +1020,12 @@ def send_email(file_path):
 def statistics():
     return None
 
-# [❌]
-# A Function To Create A Log Action
+# [✅]
 def log(event, details):
+    '''
+    A function to create a log event
+    '''
+
     # Getting the formatted date
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Opening the logs file
@@ -969,17 +1033,23 @@ def log(event, details):
         # Writing to our file in a formatted manner
         log.write(f"\n[{timestamp}] | {event}: {details}\n")
 
-# [❌]
-# A Function To Open The Logs File
+# [✅]
 def get_logs():
-    print(f"\n{Color.GREEN}Getting Logs{Color.END}\n")
+    '''
+    A function that prints the logs to screen
+    '''
+
+    print(f"\n{Color.GREEN}Getting Logs{Color.END}")
     with open(LOGS_FILE, 'r') as file:
         content = file.read()
         print(content)
 
-# [❌]
-# A Function To Clear The Logs File
+# [✅]
 def clear_logs():
+    '''
+    A function that clears the logs.txt file
+    '''
+
     print(f"\n{Color.GREEN}Clearing Logs{Color.END}\n")
     try:
         with open(LOGS_FILE, 'w') as f:
@@ -988,15 +1058,20 @@ def clear_logs():
     except Exception as e:
         print(f"{Color.RED}Error clearing the logs file: {e}{Color.END}")
 
-# [❌]
-# A Function To Open And Modify The Dream Template
+# [✅]
 def get_template():
+    '''
+    A fuinction that opens the template using the text editor
+    '''
     print(f"\n{Color.GREEN}Opening Journal Template{Color.END}\n")
     subprocess.run(TEXT_EDITOR + [TEMPLATE_DIRECTORY])
     
 # [✅]
-# A Function To Display All Our Commands
 def display_help():
+    '''
+    A function that displays all commands
+    '''
+
     print(f"\nAvailable commands: \n")
     print(f"'{Color.GREEN}create{Color.END}'       - Create a new journy entry")
     print(f"'{Color.GREEN}navigate{Color.END}'     - View yur dream entries")
@@ -1008,15 +1083,21 @@ def display_help():
     print(f"'{Color.GREEN}clear{Color.END}'        - Clear the terminal")
     print(f"'{Color.GREEN}exit{Color.END}'         - Exit the program\n")
 
-# [❌]
-# Stupid NVIM deleted this, and saved
+# [✅]
 def clear_terminal():
+    ''' 
+    A function that clears the terminal using 'clear' command
+    '''
+
     os.system('cls' if os.name == 'nt' else 'clear')
     print(PROGRAM_NAME)
 
-# [❌]
-# Stupid NVIM deleted this, and saved
+# [✅]
 def handle_commands(input_command):
+    '''
+    A function that connects all commands to their functions
+    '''
+
     commands = {
         "help": display_help,
         "create": create_entry,
@@ -1040,15 +1121,18 @@ def handle_commands(input_command):
         print(f"\n{Color.RED}Unknown Command{Color.END}: [{input_command}] | Type 'help' for a list of commands.\n")
 
 # [✅]
-# The Main Function
 def main():
+    '''
+    A function that creates the program loop,
+    it only exits if the user enters the exit command
+    '''
+
     clear_terminal() 
     while True:
         user_command = input("Enter a command (type 'help' for commands): ").strip().lower()
         handle_commands(user_command)
 
 # [✅]
-# Ensures setup is correct
 def loader():
     '''
     A function that ensures that all directories have been made,
@@ -1073,6 +1157,7 @@ def loader():
     # Otherwise, return True
     return True
 
+#
 if __name__ == "__main__":
     loaded = loader()
     if loaded:
