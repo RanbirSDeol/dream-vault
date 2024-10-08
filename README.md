@@ -22,7 +22,8 @@ You can modify the paths for logs, syncs, templates, journal, and backups in the
 ## Prerequisites
 
 Ensure you have the following installed on your system:
-- [Python 3](https://www.python.org/downloads/) 
+
+- [Python 3](https://www.python.org/downloads/)
 - [Git](https://git-scm.com/downloads)
 
 ## Step 1: Clone the Repository
@@ -41,14 +42,18 @@ cd dream-vault
 
 ## Step 3: Create Necessary Directories
 
-Make sure you are inside the /dream-vault directory when doing this. You 
+Make sure you are inside the /dream-vault directory when doing this. You
 can also choose to change the location of journal if you wish, but you must
 go into dream-vault/src/journal.py and edit the directories path.
+
+Also add a sync.txt (optional: if you want to use the sync command)
 
 ```bash
 mkdir backups
 mkdir journal
+touch sync.txt
 ```
+
 ## Step 4: Execute Program
 
 Navigate to the source folder, and execute the program
@@ -69,4 +74,3 @@ Dream Journal Assistance
 
 Enter a command (type 'help' for commands): help
 ```
-
