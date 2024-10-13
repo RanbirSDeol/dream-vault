@@ -21,6 +21,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from collections import Counter
 
 # Directories
 
@@ -46,6 +47,9 @@ Template, otherwise, keep this false, if you are only backing up or syncing with
 '''
 SYNC_EXTERNAL = False
 
+# This variable controls if we can delete dream entries [safety]
+CAN_DELETE = False
+
 # Color Codes
 
 class Color:
@@ -53,6 +57,8 @@ class Color:
     CYAN = '\033[96m'
     DARKCYAN = '\033[36m'
     BLUE = '\033[94m'
+    MAGENTA = '\033[35m'
+    GRAY = '\033[37m'
     GREEN = '\033[92m'
     YELLOW = '\033[93m'
     RED = '\033[91m'
@@ -63,7 +69,7 @@ class Color:
 # Constants
 
 # The programs name that will be displayed
-PROGRAM_NAME =  Color.GREEN + "Dream Journal Assistance\n" + Color.END
+PROGRAM_NAME =  Color.GREEN + "Dream Journal\n" + Color.END
 # The text editor to be used to open entries
 TEXT_EDITOR = ["emacs", "-nw"]
 # Words per line for every dream entry that is from a sync
@@ -100,10 +106,10 @@ ERROR_MESSAGES = [
     f"{Color.RED}Error!: [Unable To Create Dream Entry]{Color.END}",
 ]
 
-# Lists of values that can be auto selected from the title, and inserted into the statisitcs of an entry
-DREAM_TYPES = ['Normal', 'Lucid', 'Nightmare', 'Vivid']
+""" # Lists of values that can be auto selected from the title, and inserted into the statisitcs of an entry
+DREAM_TYPES = ['Normal', 'Lucid', 'Nightmare', 'Vivid', '']
 TECHNIQUES = ['None', 'WILD', 'DILD', 'SSILD', 'MILD']
-SLEEP_CYCLE = ['Regular', 'WBTB']
+SLEEP_CYCLE = ['Regular', 'WBTB'] """
 
 SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 587
@@ -257,10 +263,10 @@ def create_dream(year, month, day, title, content, backup):
             template_content = template_content.replace('TITLE_HERE', title)
 
             # Dream Inputs, and writing them to a file
-            dream_type = input("Enter a dream type (Normal, Lucid, Vivid, Nightmare, No Recall): ")
+            dream_type = input("Enter a dream type (Vague, Normal, Vivid, Lucid, Nightmare, No Recall): ")
             template_content = template_content.replace('dream_type', dream_type)
 
-            dream_tech = input("Enter a dream technique (None, WILD, SSILD): ")
+            dream_tech = input("Enter a dream technique (None, WILD, DILD, MILD, SSILD): ")
             template_content = template_content.replace('dream_tech', dream_tech)
 
             sleep_cycle = input("Enter a sleep cycle (Regular, WBTB): ")
@@ -618,13 +624,45 @@ def display_dream(file_path, openEditor):
             # If editor is False, read it to the console only
             if openEditor == False:
                 # We must check if it has a valid date, we'll display the error to the user, so that they can fix it
-                if (date_formatter(extract_date_from_file(file_path), False, True) == 'DirtyEntry'):
+                if date_formatter(extract_date_from_file(file_path), False, True) == 'DirtyEntry':
                     print("───────────────────────────────────────────────────────────────────────")
                     print(f"{Color.RED}Malformed Date!:\n1. Change Date To A Valid: [Day Month, Year]\n2. Use 'r' Command To Refresh\n3. Error Should Be Resolved{Color.END}")
+                
                 # Otherwise, normally print to the screen
-                content = file.read()
-                print(content)
+                lines = file.readlines()
+                for i, line in enumerate(lines):
+                    # Color the dream types
+                    if i == 2 and "Lucid" in line:
+                        line = line.replace("Lucid", f"{Color.YELLOW}Lucid{Color.END}")
+                    if i == 2 and "Vivid" in line:
+                        line = line.replace("Vivid", f"{Color.GREEN}Vivid{Color.END}")
+                    if i == 2 and "Nightmare" in line:
+                        line = line.replace("Nightmare", f"{Color.RED}Nightmare{Color.END}")
+                    if i == 2 and "Vague" in line:
+                        line = line.replace("Vague", f"{Color.GRAY}Vague{Color.END}")
+                    
+                    # Color the dream techniques
+                    if i == 3 and "WILD" in line:
+                        line = line.replace("WILD", f"{Color.BLUE}WILD{Color.END}")
+                    if i == 3 and "MILD" in line:
+                        line = line.replace("MILD", f"{Color.RED}MILD{Color.END}")
+                    if i == 3 and "SSILD" in line:
+                        line = line.replace("SSILD", f"{Color.CYAN}SSILD{Color.END}")
+                    
+                    # Color the sleep cycles
+                    if i == 4 and "Regular" in line:
+                        line = line.replace("Regular", f"{Color.GRAY}Regular{Color.END}")
+                    if i == 4 and "WBTB" in line:
+                        line = line.replace("WBTB", f"{Color.MAGENTA}WBTB{Color.END}")
+
+                    # Color the N/A's
+                    if i == 2 or i == 3 or i == 4 and "N/A" in line:
+                        line = line.replace("N/A", f"{Color.RED}N/A{Color.END}")
+
+                    # Print each line
+                    print(line.strip())
                 return True
+            
             # If editor is True, let's open it with our text editor
             else:
                 subprocess.run(TEXT_EDITOR + [file_path])
@@ -698,7 +736,7 @@ def navigate():
         # Displaying errors in the local log
         for item in error_log:
             print(item)
-        
+    
         # Command prompt
         print("───────────────────────────────────────────────────────────────────────\n")
         print(f"{Color.GREEN}Commands: [n]ext, [p]revious, [e]dit, [d]elete, [r]efresh, [i]ndex, [c]lear logs, [q]uit{Color.END}")
@@ -718,18 +756,21 @@ def navigate():
             display_dream(dream_files[index], True) 
         elif command == 'd':
             # Delete a dream entry
-            delete_entry(dream_files[index])
+            if CAN_DELETE == True:
+                delete_entry(dream_files[index])
 
-            # Update list of files after deletion
-            dream_files = list_files(JOURNAL_DIRECTORY) 
+                # Update list of files after deletion
+                dream_files = list_files(JOURNAL_DIRECTORY) 
 
-            # If there a no dream files, throw and errors
-            if not dream_files:
-                print(f"\n{Color.YELLOW}No Dream Entries Found!{Color.END}\n")
-                break
-            # Otherwise, if the length is greater, decrement it
-            if index >= len(dream_files):
-                index = len(dream_files) - 1
+                # If there a no dream files, throw and errors
+                if not dream_files:
+                    print(f"\n{Color.YELLOW}No Dream Entries Found!{Color.END}\n")
+                    break
+                # Otherwise, if the length is greater, decrement it
+                if index >= len(dream_files):
+                    index = len(dream_files) - 1
+            else:
+                error_log.append((f"\n{Color.RED}Deleting Dreams is Disabled\nUse 'toggle_del' command to change.{Color.END}\n"))
 
         # If the command is to refresh, we'll load the file again
         elif command == 'r':
@@ -1018,7 +1059,65 @@ def send_email(file_path):
 
 # [❌]
 def statistics():
-    return None
+    '''
+    A function that goes through all the dream entries and returns the following statistics:
+    - Dreams Journals: X
+    - All Categories:
+        - Dream Types: {dream_types}
+        - Techniques: {techniques}
+        - Sleep Cycles: {sleep_cycles}
+    '''
+    
+    # Use Counter to count occurrences
+    dream_type_count = Counter()
+    technique_count = Counter()
+    sleep_cycle_count = Counter()
+    
+    # Let us get all the dream files
+    dream_files = list_files(JOURNAL_DIRECTORY)
+    
+    # Checking if we have any dreams
+    if not dream_files:
+        print(f"\n{Color.YELLOW}No Dream Entries Found{Color.END}\n")
+        return  # Early exit since there are no entries to process
+    
+    # Process each dream file
+    for file_path in dream_files:
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+            
+            # Extract and count Dream Types (assuming it's always on the 2nd line)
+            if len(lines) > 2 and lines[2].startswith("Dream Type:"):
+                dream_types = lines[2].split("Dream Type:")[1].strip().split(", ")
+                dream_type_count.update(dream_types)
+            
+            # Extract and count Techniques (always on the 4th line)
+            if len(lines) > 3 and lines[3].startswith("Technique:"):
+                techniques = lines[3].split("Technique:")[1].strip().split(", ")
+                technique_count.update(techniques)
+                
+            # Extract and count Sleep Cycles (assuming it's always on the 5th line)
+            if len(lines) > 4 and lines[4].startswith("Sleep Cycle:"):
+                sleep_cycles = lines[4].split("Sleep Cycle:")[1].strip().split(", ")
+                sleep_cycle_count.update(sleep_cycles)
+    
+    # Prepare statistics output
+    num_dream_journals = len(dream_files)
+    
+    dream_types_output = "\n".join([f"{dt}: {count}" for dt, count in dream_type_count.items()])
+    techniques_output = "\n".join([f"{tech}: {count}" for tech, count in technique_count.items()])
+    sleep_cycles_output = "\n".join([f"{sc}: {count}" for sc, count in sleep_cycle_count.items()])
+    
+    statistics_output = (
+        f"\n{Color.GREEN}Dream Journals{Color.END}: {num_dream_journals}\n"
+        f"\n{Color.BLUE}Dream Types{Color.END}:\n{dream_types_output}\n"
+        f"\n{Color.PURPLE}Techniques{Color.END}:\n{techniques_output}\n"
+        f"\n{Color.RED}Sleep Cycles{Color.END}:\n{sleep_cycles_output}\n"
+    )
+    
+    print("───────────────────────────────────────────────────────────────────────")
+    print(statistics_output)
+    print("───────────────────────────────────────────────────────────────────────")
 
 # [✅]
 def log(event, details):
@@ -1066,6 +1165,17 @@ def get_template():
     print(f"\n{Color.GREEN}Opening Journal Template{Color.END}\n")
     subprocess.run(TEXT_EDITOR + [TEMPLATE_DIRECTORY])
     
+def toggle_deletion():
+    '''
+    A function to toggle deletion on and off
+    '''
+    global CAN_DELETE
+    CAN_DELETE = not CAN_DELETE
+    if CAN_DELETE:
+        print(f"\n{Color.GREEN}Deletion of Dream Enabled{Color.END}\n")
+    else:
+        print(f"\n{Color.RED}Deletion of Dream Disabled{Color.END}\n")
+
 # [✅]
 def display_help():
     '''
@@ -1078,8 +1188,9 @@ def display_help():
     print(f"'{Color.GREEN}stats{Color.END}'        - View your dream statistics\n")
     print(f"'{Color.GREEN}backup{Color.END}'       - Back up all exisiting dreams to a (.txt)")
     print(f"'{Color.GREEN}sync{Color.END}'         - Sync all your dreams from a backup file (.txt)\n")
-    print(f"'{Color.GREEN}logs{Color.END}'         - Check the programs logs")
+    print(f"'{Color.GREEN}logs{Color.END}'         - Check the programs logs\n")
     print(f"'{Color.GREEN}clr_logs{Color.END}'     - Clear the programs logs")
+    print(f"'{Color.GREEN}toggle_del{Color.END}'   - Toggle dream deletion, currently: {CAN_DELETE}\n")
     print(f"'{Color.GREEN}clear{Color.END}'        - Clear the terminal")
     print(f"'{Color.GREEN}exit{Color.END}'         - Exit the program\n")
 
@@ -1108,8 +1219,12 @@ def handle_commands(input_command):
 
         "logs": get_logs,
         "clr_logs": clear_logs,
+        "toggle_del": toggle_deletion,
+
         "template": get_template,
         "clear": clear_terminal,
+
+        "stats": statistics,
 
         "exit": exit  # Assuming you want to exit the program
     }
