@@ -16,6 +16,9 @@ import subprocess
 from datetime import datetime 
 import re
 import sys
+import tty
+import time
+import termios
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -49,6 +52,9 @@ SYNC_EXTERNAL = False
 
 # This variable controls if we can delete dream entries [safety]
 CAN_DELETE = False
+
+# This variable controls if errors display in navigation
+SHOW_ERRORS_NAV = False
 
 # Color Codes
 
@@ -195,10 +201,10 @@ def create_dream(year, month, day, title, content, backup):
         entry_title = ''
 
         # Let's check if we have a valid year, and day
-        # Year: 1000 - 10000
+        # Year: 1000 - 3000
         # Day: 1 - 31
         # Month: 1 - 12
-        if not (year >= 999 and year <= 9999 and day <= 31 and day >= 1 and month <= 12 and month >= 1):
+        if not (year >= 999 and year <= 2999 and day <= 31 and day >= 1 and month <= 12 and month >= 1):
             return ERROR_MESSAGES[1]
         
         # Let's cast all the variables into their proper formats
@@ -263,13 +269,13 @@ def create_dream(year, month, day, title, content, backup):
             template_content = template_content.replace('TITLE_HERE', title)
 
             # Dream Inputs, and writing them to a file
-            dream_type = input("Enter a dream type (Vague, Normal, Vivid, Lucid, Nightmare, No Recall): ")
+            dream_type = input("Enter a dream type (Vague | Normal | Vivid | Lucid | Nightmare | No Recall): ")
             template_content = template_content.replace('dream_type', dream_type)
 
-            dream_tech = input("Enter a dream technique (None, WILD, DILD, MILD, SSILD): ")
+            dream_tech = input("Enter a dream technique (None | WILD | DILD | MILD | SSILD): ")
             template_content = template_content.replace('dream_tech', dream_tech)
 
-            sleep_cycle = input("Enter a sleep cycle (Regular, WBTB): ")
+            sleep_cycle = input("Enter a sleep cycle (Regular | Nap | WBTB): ")
             template_content = template_content.replace('dream_cycle', sleep_cycle)
 
             # Creating our dream entry, and setting it to our template's content
@@ -549,9 +555,12 @@ def list_files(directory):
                 if date != 'DirtyEntry':
                     # If the date exists, let's add it to our files
                     if date:
-                        files.append((date, file_path))
+                        # files.append((date, file_path))
+                        # Ensures that the latest created dream comes first
+                        files[:0] = [(date, file_path)]
                 elif date == 'DirtyEntry':
-                    files.append(('01-01-0001', file_path))
+                    files[:0] = [('01-01-0001', file_path)]
+                    #files.append(('01-01-0001', file_path))
 
     # Sort files by date in descending order (newest to oldest)
     # It first checks year, month, and then date, and then we reverse and set
@@ -605,13 +614,15 @@ def extract_date_from_file(file_path):
         return 'DirtyEntry'
 
 # [✅]
-def display_dream(file_path, openEditor):
+def display_dream(file_path, openEditor, returnDate, searchWord):
     """
     A function that displays a dream to the console
 
     Arguments:
         file_path (str): The files path, so that we can read it
         openEditor (str): If we want to edit the file or not
+        returnDate (bool): If we want to only return the date
+        searchWord (str): A word we want to highlight (search function)
         
     Returns:
         True is everything was displayed correctly, False if an error occured
@@ -625,9 +636,13 @@ def display_dream(file_path, openEditor):
             if openEditor == False:
                 # We must check if it has a valid date, we'll display the error to the user, so that they can fix it
                 if date_formatter(extract_date_from_file(file_path), False, True) == 'DirtyEntry':
-                    print("───────────────────────────────────────────────────────────────────────")
                     print(f"{Color.RED}Malformed Date!:\n1. Change Date To A Valid: [Day Month, Year]\n2. Use 'r' Command To Refresh\n3. Error Should Be Resolved{Color.END}")
+                    print("───────────────────────────────────────────────────────────────────────")
                 
+                # If we only want the date, return it [formatting]
+                if returnDate:
+                    return extract_date_from_file(file_path)
+
                 # Otherwise, normally print to the screen
                 lines = file.readlines()
                 for i, line in enumerate(lines):
@@ -648,6 +663,8 @@ def display_dream(file_path, openEditor):
                         line = line.replace("MILD", f"{Color.RED}MILD{Color.END}")
                     if i == 3 and "SSILD" in line:
                         line = line.replace("SSILD", f"{Color.CYAN}SSILD{Color.END}")
+                    if i == 3 and "DILD" in line:
+                        line = line.replace("DILD", f"{Color.YELLOW}DILD{Color.END}")
                     
                     # Color the sleep cycles
                     if i == 4 and "Regular" in line:
@@ -658,6 +675,13 @@ def display_dream(file_path, openEditor):
                     # Color the N/A's
                     if i == 2 or i == 3 or i == 4 and "N/A" in line:
                         line = line.replace("N/A", f"{Color.RED}N/A{Color.END}")
+
+                    if "[EMPTY]" in line:
+                        line = line.replace("[EMPTY]", f"{Color.RED}[EMPTY]{Color.END}")
+
+                    if searchWord:
+                        pattern = re.compile(re.escape(searchWord), re.IGNORECASE)
+                        line = pattern.sub(f"{Color.GREEN}{Color.UNDERLINE}{searchWord}{Color.END}", line)
 
                     # Print each line
                     print(line.strip())
@@ -673,6 +697,17 @@ def display_dream(file_path, openEditor):
         log("Unknown Error", e)
         print(f"{Color.RED}Error! {e}{Color.END}")
         return False
+
+# [X]
+def getch():
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        ch = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return ch
 
 # [✅]
 def navigate():
@@ -718,7 +753,7 @@ def navigate():
 
         # Let's check if we have a negative index
         if index < 0:
-            # Set it to zero, [avoiding crashses]
+            # Set it to zero, [avoiding crashes]
             index = 0
 
         # Otherwise, if it's greater than the amount of files we have, remove 1, which wraps around to the start
@@ -726,23 +761,24 @@ def navigate():
             index = len(dream_files) - 1
 
         # Dream Count Display
-        print(f"\n{Color.BLUE}Dream: [{index + 1}/{len(dream_files)}]{Color.END} | @ {dream_files[index]}\n\n───────────────────────────────────────────────────────────────────────")
+        print(f"{Color.BLUE}Dream: [{index + 1}/{len(dream_files)}]{Color.END} | {Color.BLUE}{display_dream(dream_files[index], False, True, False)}{Color.END} | @ {dream_files[index]}\n\n───────────────────────────────────────────────────────────────────────")
         
         # Display the latest dream
-        display_attempt = display_dream(dream_files[index], False)
+        display_attempt = display_dream(dream_files[index], False, False, False)
         if not display_attempt:
             error_log.append((f"\n{Color.RED}Failed To Display Entry!{Color.END}: [{dream_files[index]}]\n"))
 
         # Displaying errors in the local log
-        for item in error_log:
-            print(item)
+        if SHOW_ERRORS_NAV:
+            for item in error_log:
+                print(item)
     
         # Command prompt
         print("───────────────────────────────────────────────────────────────────────\n")
-        print(f"{Color.GREEN}Commands: [n]ext, [p]revious, [e]dit, [d]elete, [r]efresh, [i]ndex, [c]lear logs, [q]uit{Color.END}")
+        print(f"{Color.GREEN}Commands: [n]ext, [p]revious, [e]dit, [d]elete, [s]earch, [i]ndex, [c]lear logs, [q]uit{Color.END}")
         
-        # Command input, make it lower, and remove spaces
-        command = input("\nEnter a command: ").strip().lower()
+        # Read single character input without requiring Enter
+        command = getch().lower()
 
         # If the user wants to go next
         if command == 'n':
@@ -753,7 +789,7 @@ def navigate():
             index = (index - 1) % len(dream_files)
         elif command == 'e':
             # Display our dream, with editing on
-            display_dream(dream_files[index], True) 
+            display_dream(dream_files[index], True, False, False) 
         elif command == 'd':
             # Delete a dream entry
             if CAN_DELETE == True:
@@ -762,7 +798,7 @@ def navigate():
                 # Update list of files after deletion
                 dream_files = list_files(JOURNAL_DIRECTORY) 
 
-                # If there a no dream files, throw and errors
+                # If there are no dream files, throw an error
                 if not dream_files:
                     print(f"\n{Color.YELLOW}No Dream Entries Found!{Color.END}\n")
                     break
@@ -770,20 +806,68 @@ def navigate():
                 if index >= len(dream_files):
                     index = len(dream_files) - 1
             else:
-                error_log.append((f"\n{Color.RED}Deleting Dreams is Disabled\nUse 'toggle_del' command to change.{Color.END}\n"))
+                error_log.append((f"{Color.RED}Deleting Dreams is Disabled\nUse 'toggle_del' command to change.{Color.END}"))
 
-        # If the command is to refresh, we'll load the file again
-        elif command == 'r':
-            # If the path exists still
-            if os.path.exists(dream_files[index]):
-                # Clear terminal
+        # If the command is to search, we'll start searching
+        elif command == 's':                
+            # Prompt the user for a search keyword
+            search_keyword = input("Search keyword: ").strip()
+
+            # Gather a list of files that match the search phrase along with their original index
+            matching_files = []
+            for index, file in enumerate(dream_files):
+                with open(os.path.join(JOURNAL_DIRECTORY, file), 'r') as f:
+                    content = f.read().lower()
+                    if search_keyword.lower() in content:
+                        matching_files.append((file, index))  # Store both the file and its original index
+
+            # If no matches found, log an error
+            if not matching_files:
+                print(f"{Color.RED}No Matches For: {search_keyword}{Color.END}")
+                time.sleep(1)
+
+            # New search-based navigation
+            search_index = 0
+
+            while matching_files:
+                # Clear the terminal
                 clear_terminal()
-                # Display the current dream we're on
-                display_attempt_refresh = display_dream(dream_files[index], False)
 
-                # Failed to display
-                if not display_attempt_refresh:
-                    error_log.append((f"\n{Color.RED}Failed To Display Entry!{Color.END}: [{dream_files[index]}]\n"))
+                # Display the search results and current file
+                print(f"{Color.BLUE}Search Results: [{search_index + 1}/{len(matching_files)}]{Color.END} | {Color.BLUE}{display_dream(matching_files[search_index][0], False, True, False)}{Color.END} | {Color.GREEN}Index: {matching_files[search_index][1]+1}{Color.END} | @ {matching_files[search_index][0]}\n\n───────────────────────────────────────────────────────────────────────")
+                
+                # Show the content of the currently selected dream
+                display_attempt = display_dream(matching_files[search_index][0], False, False, search_keyword)
+                if not display_attempt:
+                    error_log.append((f"\n{Color.RED}Failed To Display Entry!{Color.END}: [{matching_files[search_index]}]\n"))
+
+                # Displaying errors in the local log
+                if SHOW_ERRORS_NAV:
+                    for item in error_log:
+                        print(item)
+
+                # Command prompt for the search navigation
+                print("───────────────────────────────────────────────────────────────────────\n")
+                print(f"{Color.GREEN}Commands: [n]ext, [p]revious, [e]dit, [b]ack{Color.END}")
+
+                # Read single character input
+                search_command = getch().lower()
+
+                if search_command == 'n':
+                    # Move to the next matching file
+                    search_index = (search_index + 1) % len(matching_files)
+                elif search_command == 'p':
+                    # Move to the previous matching file
+                    search_index = (search_index - 1) % len(matching_files)
+                elif search_command == 'e':
+                    # Edit the current file
+                    display_dream(matching_files[search_index], True, False, False)
+                elif search_command == 'b':
+                    # Return to the main navigation
+                    break
+                else:
+                    # Invalid command handling
+                    error_log.append((f"\n{Color.RED}Unknown Command{Color.END}: [{search_command}]\n"))
 
         # If the command is to index to a certain dream location
         elif command == 'i':
@@ -793,7 +877,7 @@ def navigate():
                 index_location = int(index_location)
                 # Check if index_location is within the valid range
                 if 0 <= index_location <= len(dream_files):
-                    # Set our index to the proper location, subract 1, index's start at 0
+                    # Set our index to the proper location, subtract 1, indexes start at 0
                     index = index_location - 1
                 else:
                     # Handle invalid index input
@@ -1057,7 +1141,7 @@ def send_email(file_path):
     except Exception as e:
         print(f'\n{Color.RED}Failed to send email: {e}{Color.END}\n')
 
-# [❌]
+# [✅]
 def statistics():
     '''
     A function that goes through all the dream entries and returns the following statistics:
@@ -1089,17 +1173,49 @@ def statistics():
             # Extract and count Dream Types (assuming it's always on the 2nd line)
             if len(lines) > 2 and lines[2].startswith("Dream Type:"):
                 dream_types = lines[2].split("Dream Type:")[1].strip().split(", ")
-                dream_type_count.update(dream_types)
+                for dt in dream_types:
+                    # Color the dream types
+                    if "Lucid" in dt:
+                        dt = dt.replace("Lucid", f"{Color.YELLOW}Lucid{Color.END}")
+                    if "Vivid" in dt:
+                        dt = dt.replace("Vivid", f"{Color.GREEN}Vivid{Color.END}")
+                    if "Nightmare" in dt:
+                        dt = dt.replace("Nightmare", f"{Color.RED}Nightmare{Color.END}")
+                    if "Vague" in dt:
+                        dt = dt.replace("Vague", f"{Color.GRAY}Vague{Color.END}")
+                    if "N/A" in dt:
+                        dt = dt.replace("N/A", f"{Color.RED}N/A{Color.END}")
+                    dream_type_count.update([dt])
             
             # Extract and count Techniques (always on the 4th line)
             if len(lines) > 3 and lines[3].startswith("Technique:"):
                 techniques = lines[3].split("Technique:")[1].strip().split(", ")
-                technique_count.update(techniques)
+                for tech in techniques:
+                    # Color the dream techniques
+                    if "WILD" in tech:
+                        tech = tech.replace("WILD", f"{Color.BLUE}WILD{Color.END}")
+                    if "MILD" in tech:
+                        tech = tech.replace("MILD", f"{Color.RED}MILD{Color.END}")
+                    if "SSILD" in tech:
+                        tech = tech.replace("SSILD", f"{Color.CYAN}SSILD{Color.END}")
+                    if "DILD" in tech:
+                        tech = tech.replace("DILD", f"{Color.YELLOW}DILD{Color.END}")
+                    if "N/A" in tech:
+                        tech = tech.replace("N/A", f"{Color.RED}N/A{Color.END}")
+                    technique_count.update([tech])
                 
             # Extract and count Sleep Cycles (assuming it's always on the 5th line)
             if len(lines) > 4 and lines[4].startswith("Sleep Cycle:"):
                 sleep_cycles = lines[4].split("Sleep Cycle:")[1].strip().split(", ")
-                sleep_cycle_count.update(sleep_cycles)
+                for sc in sleep_cycles:
+                    # Color the sleep cycles
+                    if "Regular" in sc:
+                        sc = sc.replace("Regular", f"{Color.GRAY}Regular{Color.END}")
+                    if "WBTB" in sc:
+                        sc = sc.replace("WBTB", f"{Color.MAGENTA}WBTB{Color.END}")
+                    if "N/A" in sc:
+                        sc = sc.replace("N/A", f"{Color.RED}N/A{Color.END}")
+                    sleep_cycle_count.update([sc])
     
     # Prepare statistics output
     num_dream_journals = len(dream_files)
@@ -1164,7 +1280,8 @@ def get_template():
     '''
     print(f"\n{Color.GREEN}Opening Journal Template{Color.END}\n")
     subprocess.run(TEXT_EDITOR + [TEMPLATE_DIRECTORY])
-    
+
+# [✅]  
 def toggle_deletion():
     '''
     A function to toggle deletion on and off
