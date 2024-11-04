@@ -262,13 +262,14 @@ def create_dream(year, month, day, title, content, backup):
             with open(TEMPLATE_DIRECTORY, 'r') as template:
                 template_content = template.read() 
 
+            # Replace the title of the dream, add [U] meaning uncomplete
+            template_content = template_content.replace('TITLE_HERE', title + " [U]")
+
             # Replace the place holder date, with our formatted file date
             template_content = template_content.replace('DATE_HERE', file_date)
 
-            # Replace the title of the dream
-            template_content = template_content.replace('TITLE_HERE', title)
-
             # Dream Inputs, and writing them to a file
+
             dream_type = input("Enter a dream type (Vague | Normal | Vivid | Lucid | Nightmare | No Recall): ")
             template_content = template_content.replace('dream_type', dream_type)
 
@@ -518,7 +519,7 @@ def date_formatter(date_unformatted, flipped, bracketBug):
     return 'DirtyEntry'
 
 # [✅]
-def list_files(directory):
+def list_files_old(directory):
     """
     A function that searches every file within a directory
 
@@ -536,7 +537,7 @@ def list_files(directory):
     # Loop through all the dream files
     for root, _, file_names in os.walk(directory):
 
-        # Looping throw all the files
+        # Looping through all the files
         for file_name in file_names:
 
             # If we have a .txt
@@ -555,12 +556,13 @@ def list_files(directory):
                 if date != 'DirtyEntry':
                     # If the date exists, let's add it to our files
                     if date:
-                        # files.append((date, file_path))
+                        #files.insert(0, (date, file_path))
+                        files.append((date, file_path))
                         # Ensures that the latest created dream comes first
-                        files[:0] = [(date, file_path)]
+                        #files[:0] = [(date, file_path)]
                 elif date == 'DirtyEntry':
-                    files[:0] = [('01-01-0001', file_path)]
-                    #files.append(('01-01-0001', file_path))
+                    #files[:0] = [('01-01-0001', file_path)]
+                    files.append(('01-01-0001', file_path))
 
     # Sort files by date in descending order (newest to oldest)
     # It first checks year, month, and then date, and then we reverse and set
@@ -569,6 +571,59 @@ def list_files(directory):
     # Return our list of files
     # Ex: files = [('file1', '/path/to/file1.txt'),..
     return [file_path for _, file_path in files]
+
+import os
+from datetime import datetime
+
+def list_files(directory):
+    """
+    A function that searches every file within a directory
+
+    Arguments:
+        directory (str): The directory we want to search
+        
+    Returns:
+        All the files organized by date [Newest -> Oldest]
+        Sort Check: Year, Month, Day, and creation time
+    """
+
+    # List to store our files
+    files = []
+
+    # Loop through all the dream files
+    for root, _, file_names in os.walk(directory):
+        # Looping through all the files
+        for file_name in file_names:
+            # If we have a .txt
+            if file_name.endswith(".txt"):
+                # Create the path
+                file_path = os.path.join(root, file_name)
+
+                # Get the date from the entry.txt
+                date = extract_date_from_file(file_path)
+                
+                # Format the date and check for validity
+                date = date_formatter(date, False, True)
+
+                # If date is valid
+                if date != 'DirtyEntry':
+                    if date:
+                        # Append the date and creation time
+                        creation_time = os.path.getctime(file_path)
+                        files.append((date, creation_time, file_path))
+                else:
+                    # If date is malformed
+                    creation_time = os.path.getctime(file_path)
+                    files.append(('01-01-0001', creation_time, file_path))
+
+    # Sort by date (newest to oldest), and then by creation time (newest to oldest)
+    files.sort(
+        key=lambda entry: (datetime.strptime(entry[0], "%d-%m-%Y"), entry[1]),
+        reverse=True
+    )
+
+    # Return the list of file paths, sorted by date and creation time
+    return [file_path for _, _, file_path in files]
 
 # [✅]
 def extract_date_from_file(file_path):
@@ -646,6 +701,9 @@ def display_dream(file_path, openEditor, returnDate, searchWord):
                 # Otherwise, normally print to the screen
                 lines = file.readlines()
                 for i, line in enumerate(lines):
+                    if i == 0 and "[U]" in line:
+                        line = line.replace("[U]", f"{Color.RED}[U]{Color.END}")
+
                     # Color the dream types
                     if i == 2 and "Lucid" in line:
                         line = line.replace("Lucid", f"{Color.YELLOW}Lucid{Color.END}")
@@ -848,7 +906,7 @@ def navigate():
 
                 # Command prompt for the search navigation
                 print("───────────────────────────────────────────────────────────────────────\n")
-                print(f"{Color.GREEN}Commands: [n]ext, [p]revious, [e]dit, [b]ack{Color.END}")
+                print(f"{Color.GREEN}Commands: [n]ext, [p]revious, [b]ack{Color.END}")
 
                 # Read single character input
                 search_command = getch().lower()
@@ -861,7 +919,8 @@ def navigate():
                     search_index = (search_index - 1) % len(matching_files)
                 elif search_command == 'e':
                     # Edit the current file
-                    display_dream(matching_files[search_index], True, False, False)
+                    print("Disabled...")
+                    # display_dream(matching_files[search_index], True, False, False)
                 elif search_command == 'b':
                     # Return to the main navigation
                     break
