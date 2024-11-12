@@ -56,6 +56,9 @@ CAN_DELETE = False
 # This variable controls if errors display in navigation
 SHOW_ERRORS_NAV = False
 
+#This variable controls if we want to add the unfinished tag [U]
+SHOW_UNFINISHED_TAG = False
+
 # Color Codes
 
 class Color:
@@ -262,8 +265,11 @@ def create_dream(year, month, day, title, content, backup):
             with open(TEMPLATE_DIRECTORY, 'r') as template:
                 template_content = template.read() 
 
-            # Replace the title of the dream, add [U] meaning uncomplete
-            template_content = template_content.replace('TITLE_HERE', title + " [U]")
+            if SHOW_UNFINISHED_TAG:
+                # Replace the title of the dream, add [U] meaning uncomplete
+                template_content = template_content.replace('TITLE_HERE', title + " [U]")
+            else:
+                template_content = template_content.replace('TITLE_HERE', title)
 
             # Replace the place holder date, with our formatted file date
             template_content = template_content.replace('DATE_HERE', file_date)
@@ -793,7 +799,8 @@ def navigate():
     error_log = []
 
     # A file that stores all of our files inside of our journal directory
-    dream_files = list_files(JOURNAL_DIRECTORY)
+    #dream_files = list_files(JOURNAL_DIRECTORY)
+    dream_files = list_files(JOURNAL_DIRECTORY)[::-1]
 
     # There are no files, let's display that we don't have any entries
     if not dream_files:
@@ -801,7 +808,8 @@ def navigate():
         return
 
     # Index to keep track of what file we are looking at currently
-    index = 0
+    #index = 0
+    index = len(dream_files) - 1
 
     # Main display loop
     while True:
@@ -812,11 +820,15 @@ def navigate():
         # Let's check if we have a negative index
         if index < 0:
             # Set it to zero, [avoiding crashes]
-            index = 0
+            #index = 0
+            index = len(dream_files) - 1
 
         # Otherwise, if it's greater than the amount of files we have, remove 1, which wraps around to the start
         elif index >= len(dream_files):
-            index = len(dream_files) - 1
+            index = 0
+
+        #elif index >= len(dream_files):
+        #   index = len(dream_files) - 1
 
         # Dream Count Display
         print(f"{Color.BLUE}Dream: [{index + 1}/{len(dream_files)}]{Color.END} | {Color.BLUE}{display_dream(dream_files[index], False, True, False)}{Color.END} | @ {dream_files[index]}\n\n───────────────────────────────────────────────────────────────────────")
@@ -841,10 +853,10 @@ def navigate():
         # If the user wants to go next
         if command == 'n':
             # Increment the index, % to make sure we're not over the amount of files we have
-            index = (index + 1) % len(dream_files)
-        elif command == 'p':
-            # Decrement the index, % to make sure we can wrap
             index = (index - 1) % len(dream_files)
+        elif command == 'p':
+            # Decrement the index, % to make sure we can wrap            
+            index = (index + 1) % len(dream_files)
         elif command == 'e':
             # Display our dream, with editing on
             display_dream(dream_files[index], True, False, False) 
@@ -878,6 +890,8 @@ def navigate():
                     content = f.read().lower()
                     if search_keyword.lower() in content:
                         matching_files.append((file, index))  # Store both the file and its original index
+
+            matching_files = matching_files[::-1]
 
             # If no matches found, log an error
             if not matching_files:
@@ -1454,4 +1468,4 @@ if __name__ == "__main__":
     if loaded:
         main()
     else:
-        print(f"\n{Color.RED}Invalid Directories!\n1. Go Inside dream-journal/src/journal.py\n2. Go To The Top Of The File\n3. Swap Directory Variables With Valid Directories\n4. Rerun Program{Color.END}") 
+        print(f"\n{Color.RED}Invalid Directories!\n1. Go Inside dream-journal/src/journal.py\n2. Go To The Top Of The File\n3. Swap Directory Variables With Valid Directories\n4. Rerun Program{Color.END}")
