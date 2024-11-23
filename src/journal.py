@@ -63,6 +63,7 @@ SHOW_UNFINISHED_TAG = False
 
 class Color:
     PURPLE = '\033[95m'
+    TRUE_HOT_PINK = '\033[38;2;255;105;180m'
     CYAN = '\033[96m'
     DARKCYAN = '\033[36m'
     BLUE = '\033[94m'
@@ -276,7 +277,7 @@ def create_dream(year, month, day, title, content, backup):
 
             # Dream Inputs, and writing them to a file
 
-            dream_type = input("Enter a dream type (Vague | Normal | Vivid | Lucid | Nightmare | No Recall): ")
+            dream_type = input("Enter a dream type (Vague | Normal | Vivid | Vivimax | Lucid | Nightmare | No Recall): ")
             template_content = template_content.replace('dream_type', dream_type)
 
             dream_tech = input("Enter a dream technique (None | WILD | DILD | MILD | SSILD): ")
@@ -719,6 +720,8 @@ def display_dream(file_path, openEditor, returnDate, searchWord):
                         line = line.replace("Nightmare", f"{Color.RED}Nightmare{Color.END}")
                     if i == 2 and "Vague" in line:
                         line = line.replace("Vague", f"{Color.GRAY}Vague{Color.END}")
+                    if i == 2 and "Vivimax" in line:
+                        line = line.replace("Vivimax", f"{Color.TRUE_HOT_PINK}Vivimax{Color.END}")
                     
                     # Color the dream techniques
                     if i == 3 and "WILD" in line:
