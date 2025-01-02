@@ -74,12 +74,13 @@ class Color:
     RED = '\033[91m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+    BROWN = '\033[38;2;139;69;19m'
     END = '\033[0m'
 
 # Constants
 
 # The programs name that will be displayed
-PROGRAM_NAME =  Color.GREEN + "Dream Journal\n" + Color.END
+PROGRAM_NAME =  Color.GREEN + "Dream Vault\n" + Color.END
 # The text editor to be used to open entries
 TEXT_EDITOR = ["emacs", "-nw"]
 # Words per line for every dream entry that is from a sync
@@ -280,7 +281,7 @@ def create_dream(year, month, day, title, content, backup):
             dream_type = input("Enter a dream type (Vague | Normal | Vivid | Vivimax | Lucid | Nightmare | No Recall): ")
             template_content = template_content.replace('dream_type', dream_type)
 
-            dream_tech = input("Enter a dream technique (None | WILD | DILD | MILD | SSILD): ")
+            dream_tech = input("Enter a dream technique (None | WILD | RILD | DILD | MILD | SSILD): ")
             template_content = template_content.replace('dream_tech', dream_tech)
 
             sleep_cycle = input("Enter a sleep cycle (Regular | Nap | WBTB): ")
@@ -719,7 +720,7 @@ def display_dream(file_path, openEditor, returnDate, searchWord):
                     if i == 2 and "Nightmare" in line:
                         line = line.replace("Nightmare", f"{Color.RED}Nightmare{Color.END}")
                     if i == 2 and "Vague" in line:
-                        line = line.replace("Vague", f"{Color.GRAY}Vague{Color.END}")
+                        line = line.replace("Vague", f"{Color.BROWN}Vague{Color.END}")
                     if i == 2 and "Vivimax" in line:
                         line = line.replace("Vivimax", f"{Color.TRUE_HOT_PINK}Vivimax{Color.END}")
                     
@@ -732,12 +733,16 @@ def display_dream(file_path, openEditor, returnDate, searchWord):
                         line = line.replace("SSILD", f"{Color.CYAN}SSILD{Color.END}")
                     if i == 3 and "DILD" in line:
                         line = line.replace("DILD", f"{Color.YELLOW}DILD{Color.END}")
+                    if i == 3 and "RILD" in line:
+                        line = line.replace("RILD", f"{Color.TRUE_HOT_PINK}RILD{Color.END}")
                     
                     # Color the sleep cycles
                     if i == 4 and "Regular" in line:
                         line = line.replace("Regular", f"{Color.GRAY}Regular{Color.END}")
                     if i == 4 and "WBTB" in line:
                         line = line.replace("WBTB", f"{Color.MAGENTA}WBTB{Color.END}")
+                    if i == 4 and "Nap" in line:
+                        line = line.replace("Nap", f"{Color.CYAN}Nap{Color.END}")
 
                     # Color the N/A's
                     if i == 2 or i == 3 or i == 4 and "N/A" in line:
@@ -869,15 +874,15 @@ def navigate():
                 delete_entry(dream_files[index])
 
                 # Update list of files after deletion
-                dream_files = list_files(JOURNAL_DIRECTORY) 
+                dream_files = list_files(JOURNAL_DIRECTORY)[::-1]
 
                 # If there are no dream files, throw an error
                 if not dream_files:
                     print(f"\n{Color.YELLOW}No Dream Entries Found!{Color.END}\n")
                     break
                 # Otherwise, if the length is greater, decrement it
-                if index >= len(dream_files):
-                    index = len(dream_files) - 1
+                elif index >= len(dream_files):
+                    index = 0
             else:
                 error_log.append((f"{Color.RED}Deleting Dreams is Disabled\nUse 'toggle_del' command to change.{Color.END}"))
 
@@ -1194,9 +1199,9 @@ def send_email(file_path):
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
     msg['To'] = RECIPIENT_EMAIL
-    msg['Subject'] = 'Dream Journal Backup'
+    msg['Subject'] = 'Dream Vault Backup'
 
-    body = 'Please find the attached backup of the dream journal.'
+    body = 'Please find the attached backup of your dream vault.'
     msg.attach(MIMEText(body, 'plain'))
 
     attachment = open(file_path, 'rb')
@@ -1218,6 +1223,14 @@ def send_email(file_path):
         print(f'\n{Color.RED}Failed to send email: {e}{Color.END}\n')
 
 # [✅]
+def color_text(text, color_mapping):
+    """Apply color to text based on mapping."""
+    for keyword, color in color_mapping.items():
+        if keyword in text:
+            text = text.replace(keyword, color + keyword + Color.END)
+    return text
+
+# [✅]
 def statistics():
     '''
     A function that goes through all the dream entries and returns the following statistics:
@@ -1227,86 +1240,79 @@ def statistics():
         - Techniques: {techniques}
         - Sleep Cycles: {sleep_cycles}
     '''
-    
-    # Use Counter to count occurrences
+
     dream_type_count = Counter()
     technique_count = Counter()
     sleep_cycle_count = Counter()
-    
-    # Let us get all the dream files
+
     dream_files = list_files(JOURNAL_DIRECTORY)
-    
-    # Checking if we have any dreams
+
     if not dream_files:
         print(f"\n{Color.YELLOW}No Dream Entries Found{Color.END}\n")
         return  # Early exit since there are no entries to process
-    
-    # Process each dream file
+
     for file_path in dream_files:
         with open(file_path, 'r') as file:
             lines = file.readlines()
-            
-            # Extract and count Dream Types (assuming it's always on the 2nd line)
-            if len(lines) > 2 and lines[2].startswith("Dream Type:"):
-                dream_types = lines[2].split("Dream Type:")[1].strip().split(", ")
-                for dt in dream_types:
-                    # Color the dream types
-                    if "Lucid" in dt:
-                        dt = dt.replace("Lucid", f"{Color.YELLOW}Lucid{Color.END}")
-                    if "Vivid" in dt:
-                        dt = dt.replace("Vivid", f"{Color.GREEN}Vivid{Color.END}")
-                    if "Nightmare" in dt:
-                        dt = dt.replace("Nightmare", f"{Color.RED}Nightmare{Color.END}")
-                    if "Vague" in dt:
-                        dt = dt.replace("Vague", f"{Color.GRAY}Vague{Color.END}")
-                    if "N/A" in dt:
-                        dt = dt.replace("N/A", f"{Color.RED}N/A{Color.END}")
-                    dream_type_count.update([dt])
-            
-            # Extract and count Techniques (always on the 4th line)
-            if len(lines) > 3 and lines[3].startswith("Technique:"):
-                techniques = lines[3].split("Technique:")[1].strip().split(", ")
-                for tech in techniques:
-                    # Color the dream techniques
-                    if "WILD" in tech:
-                        tech = tech.replace("WILD", f"{Color.BLUE}WILD{Color.END}")
-                    if "MILD" in tech:
-                        tech = tech.replace("MILD", f"{Color.RED}MILD{Color.END}")
-                    if "SSILD" in tech:
-                        tech = tech.replace("SSILD", f"{Color.CYAN}SSILD{Color.END}")
-                    if "DILD" in tech:
-                        tech = tech.replace("DILD", f"{Color.YELLOW}DILD{Color.END}")
-                    if "N/A" in tech:
-                        tech = tech.replace("N/A", f"{Color.RED}N/A{Color.END}")
-                    technique_count.update([tech])
-                
-            # Extract and count Sleep Cycles (assuming it's always on the 5th line)
-            if len(lines) > 4 and lines[4].startswith("Sleep Cycle:"):
-                sleep_cycles = lines[4].split("Sleep Cycle:")[1].strip().split(", ")
-                for sc in sleep_cycles:
-                    # Color the sleep cycles
-                    if "Regular" in sc:
-                        sc = sc.replace("Regular", f"{Color.GRAY}Regular{Color.END}")
-                    if "WBTB" in sc:
-                        sc = sc.replace("WBTB", f"{Color.MAGENTA}WBTB{Color.END}")
-                    if "N/A" in sc:
-                        sc = sc.replace("N/A", f"{Color.RED}N/A{Color.END}")
-                    sleep_cycle_count.update([sc])
-    
+
+            for i, line in enumerate(lines):
+                # Color the dream types
+                if i == 2 and "Lucid" in line:
+                    line = line.replace("Lucid", f"{Color.YELLOW}Lucid{Color.END}")
+                if i == 2 and "Vivid" in line:
+                    line = line.replace("Vivid", f"{Color.GREEN}Vivid{Color.END}")
+                if i == 2 and "Nightmare" in line:
+                    line = line.replace("Nightmare", f"{Color.RED}Nightmare{Color.END}")
+                if i == 2 and "Vague" in line:
+                    line = line.replace("Vague", f"{Color.BROWN}Vague{Color.END}")
+                if i == 2 and "Vivimax" in line:
+                    line = line.replace("Vivimax", f"{Color.TRUE_HOT_PINK}Vivimax{Color.END}")
+
+                # Color the dream techniques
+                if i == 3 and "WILD" in line:
+                    line = line.replace("WILD", f"{Color.BLUE}WILD{Color.END}")
+                if i == 3 and "MILD" in line:
+                    line = line.replace("MILD", f"{Color.RED}MILD{Color.END}")
+                if i == 3 and "SSILD" in line:
+                    line = line.replace("SSILD", f"{Color.CYAN}SSILD{Color.END}")
+                if i == 3 and "DILD" in line:
+                    line = line.replace("DILD", f"{Color.YELLOW}DILD{Color.END}")
+                if i == 3 and "RILD" in line:
+                    line = line.replace("RILD", f"{Color.TRUE_HOT_PINK}RILD{Color.END}")
+
+                # Color the sleep cycles
+                if i == 4 and "Regular" in line:
+                    line = line.replace("Regular", f"{Color.GRAY}Regular{Color.END}")
+                if i == 4 and "WBTB" in line:
+                    line = line.replace("WBTB", f"{Color.MAGENTA}WBTB{Color.END}")
+                if i == 4 and "Nap" in line:
+                    line = line.replace("Nap", f"{Color.CYAN}Nap{Color.END}")
+
+                # Update counters
+                if i == 2:
+                    dream_types = line.split("Dream Type:")[1].strip().split(", ")
+                    dream_type_count.update(dream_types)
+                elif i == 3:
+                    techniques = line.split("Technique:")[1].strip().split(", ")
+                    technique_count.update(techniques)
+                elif i == 4:
+                    sleep_cycles = line.split("Sleep Cycle:")[1].strip().split(", ")
+                    sleep_cycle_count.update(sleep_cycles)
+
     # Prepare statistics output
     num_dream_journals = len(dream_files)
-    
-    dream_types_output = "\n".join([f"{dt}: {count}" for dt, count in dream_type_count.items()])
-    techniques_output = "\n".join([f"{tech}: {count}" for tech, count in technique_count.items()])
-    sleep_cycles_output = "\n".join([f"{sc}: {count}" for sc, count in sleep_cycle_count.items()])
-    
+
+    dream_types_output = "\n".join([f"{dt}: {count}" for dt, count in sorted(dream_type_count.items())])
+    techniques_output = "\n".join([f"{tech}: {count}" for tech, count in sorted(technique_count.items())])
+    sleep_cycles_output = "\n".join([f"{sc}: {count}" for sc, count in sorted(sleep_cycle_count.items())])
+
     statistics_output = (
         f"\n{Color.GREEN}Dream Journals{Color.END}: {num_dream_journals}\n"
         f"\n{Color.BLUE}Dream Types{Color.END}:\n{dream_types_output}\n"
         f"\n{Color.PURPLE}Techniques{Color.END}:\n{techniques_output}\n"
         f"\n{Color.RED}Sleep Cycles{Color.END}:\n{sleep_cycles_output}\n"
     )
-    
+
     print("───────────────────────────────────────────────────────────────────────")
     print(statistics_output)
     print("───────────────────────────────────────────────────────────────────────")
