@@ -281,7 +281,7 @@ def create_dream(year, month, day, title, content, backup):
             dream_type = input("Enter a dream type (Vague | Normal | Vivid | Vivimax | Lucid | Nightmare | No Recall): ")
             template_content = template_content.replace('dream_type', dream_type)
 
-            dream_tech = input("Enter a dream technique (None | WILD | RILD | DILD | MILD | SSILD): ")
+            dream_tech = input("Enter a dream technique (None | WILD | ADA | DILD | MILD | SSILD): ")
             template_content = template_content.replace('dream_tech', dream_tech)
 
             sleep_cycle = input("Enter a sleep cycle (Regular | Nap | WBTB): ")
@@ -733,8 +733,8 @@ def display_dream(file_path, openEditor, returnDate, searchWord):
                         line = line.replace("SSILD", f"{Color.CYAN}SSILD{Color.END}")
                     if i == 3 and "DILD" in line:
                         line = line.replace("DILD", f"{Color.YELLOW}DILD{Color.END}")
-                    if i == 3 and "RILD" in line:
-                        line = line.replace("RILD", f"{Color.TRUE_HOT_PINK}RILD{Color.END}")
+                    if i == 3 and "ADA" in line:
+                        line = line.replace("ADA", f"{Color.TRUE_HOT_PINK}ADA{Color.END}")
                     
                     # Color the sleep cycles
                     if i == 4 and "Regular" in line:
@@ -1277,8 +1277,8 @@ def statistics():
                     line = line.replace("SSILD", f"{Color.CYAN}SSILD{Color.END}")
                 if i == 3 and "DILD" in line:
                     line = line.replace("DILD", f"{Color.YELLOW}DILD{Color.END}")
-                if i == 3 and "RILD" in line:
-                    line = line.replace("RILD", f"{Color.TRUE_HOT_PINK}RILD{Color.END}")
+                if i == 3 and "ADA" in line:
+                    line = line.replace("ADA", f"{Color.TRUE_HOT_PINK}ADA{Color.END}")
 
                 # Color the sleep cycles
                 if i == 4 and "Regular" in line:
