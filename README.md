@@ -2,6 +2,8 @@
 
 Dream Vault is a command-line tool for managing and logging your dreams. It offers functionality for creating, navigating, and modifying dream entries, checking statistics, backing up and syncing data, and more. It also gives you full control of your files which will stay on your PC, and are not accessisible by anyone else.
 
+![Photo](/public/photo.png)
+
 ## Features
 
 - **Create and Manage Entries**: Add, read, and edit your dream entries.
